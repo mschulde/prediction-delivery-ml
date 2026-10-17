@@ -1,0 +1,18 @@
+# Credenciales y Seguridad
+kaggle.json
+.kaggle/
+.env
+
+# Entornos virtuales y caché
+venv/
+env/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Datos procesados y modelos serializados (se generan dinámicamente)
+data/processed/*.csv
+!data/processed/.gitkeep
+
+models/*.joblib
+!models/.gitkeep
