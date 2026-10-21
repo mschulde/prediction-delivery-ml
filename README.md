@@ -48,7 +48,7 @@ El modelo implementado impacta directamente en los siguientes objetivos corporat
 Se seleccionó el repositorio de datos abierto **Food Delivery Dataset** alojado en [Kaggle](https://www.kaggle.com/datasets/gauravmalik26/food-delivery-dataset), el cual consolida **45,593 registros y 20 columnas originales** con telemetría espacial, atributos de pedidos, calificaciones de repartidores e información situacional.
 
 ### 2.2 Función de Ingesta Reproducible (`src/ingesta.py`)
-Para la ingesta de datos se creo el archivo [`src/ingesta.py`](file:///D:/Catolica/prediction-delivery-ml/src/ingesta.py) con las siguientes responsabilidades:
+Para la ingesta de datos se creo el archivo `src/ingesta.py` con las siguientes responsabilidades:
 * `fetch_delivery_data()`: Se autentica de forma programática con la API oficial de Kaggle (`KaggleApi`), descarga el archivo empaquetado `train.csv.zip`, lo descomprime automáticamente en `data/raw/train.csv` y purga los artefactos temporales.
 * `load_delivery_data()`: Valida la existencia física del archivo crudo y lo carga a memoria en un DataFrame de Pandas bajo manejo de excepciones.
 
@@ -96,7 +96,7 @@ A través del EDA se detectaron valores ausentes codificados como cadenas de tex
 * **Estrategia Categórica:** Imputación por la **moda / categoría más frecuente** (`SimpleImputer(strategy='most_frequent')`), manteniendo la coherencia semántica en densidades de tráfico y factores climáticos.
 
 ### 4.2 Transformadores Personalizados con la Interfaz Scikit-Learn
-Para cumplir con los principios de *duck typing* de Scikit-Learn (`fit`, `transform`, `fit_transform`) y permitir una integración sin fisuras en pipelines, se desarrollaron en [`src/transformadores.py`](file:///D:/Catolica/prediction-delivery-ml/src/transformadores.py) dos clases modulares:
+Para cumplir con los principios de *duck typing* de Scikit-Learn (`fit`, `transform`, `fit_transform`) y permitir una integración sin fisuras en pipelines, se desarrollaron en `src/transformadores.py` dos clases modulares:
 
 #### 1. `LimpiadorFormatosKaggle`
 * **Justificación de Negocio:** El dataset contenía inconsistencias de captura de datos (números embebidos en texto, cadenas de texto con espacios colaterales).
@@ -120,7 +120,7 @@ $$\text{Distancia\_km} = R \cdot c$$
 
 ## Fase 5: Pipeline Modular de Transformación (MLOps)
 
-En [`src/pipeline.py`](file:///D:/Catolica/prediction-delivery-ml/src/pipeline.py) se ensambló una arquitectura desacoplada mediante `ColumnTransformer` para procesar en paralelo las rutas de transformación:
+En `src/pipeline.py` se ensambló una arquitectura desacoplada mediante `ColumnTransformer` para procesar en paralelo las rutas de transformación:
 ### Prevención de Data Leakage
 El cálculo de parámetros estadísticos (como las medianas de imputación, medias y desviaciones estándar del `StandardScaler`, y el vocabulario de categorías del `OneHotEncoder`) se calcula **únicamente con el método `.fit()` sobre el conjunto de entrenamiento**. Durante el procesamiento de nuevos datos o del test set, únicamente se ejecuta `.transform()`, garantizando cero contaminación informativa del conjunto de prueba.
 
@@ -131,7 +131,7 @@ El cálculo de parámetros estadísticos (como las medianas de imputación, medi
 ### 6.1 Justificación de las Métricas de Evaluación (MAE vs. RMSE vs. $R^2$)
 
 1. **Error Absoluto Medio (MAE - Métrica Primaria de Negocio):**
-   $$\text{MAE} = \frac{1}{n} \sum_{i=1}^{n} |y_i - \hat{y}_i|$$
+   $$\text{MAE} = \frac{1}{n} \sum_{i=1}^{n} \vert{}y_i - \hat{y}_i\vert{}$$
    - **Razón de Negocio:** Penaliza el error de forma puramente lineal y proporcional. Un desvío de 5 minutos equivale exactamente al doble de penalización que un desvío de 2.5 minutos. Es intuitiva, directamente auditable por los gerentes de logística y transferible al cálculo de costos operativos por retraso.
 2. **Raíz del Error Cuadrático Medio (RMSE - Métrica de Penalización de Casos Críticos):**
    $$\text{RMSE} = \sqrt{\frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2}$$
@@ -140,29 +140,28 @@ El cálculo de parámetros estadísticos (como las medianas de imputación, medi
    $$R^2 = 1 - \frac{\sum_{i=1}^{n} (y_i - \hat{y}_i)^2}{\sum_{i=1}^{n} (y_i - \bar{y})^2}$$
    - **Razón Estadística:** Mide qué porcentaje de la variabilidad del tiempo de entrega es explicada por las características procesadas respecto a una estimación ingenua basada en la media global.
 
-### 6.2 Resultados Empíricos y Análisis de Overfitting
-Se entrenó el algoritmo de **Regresión Lineal (`LinearRegression`)**, arrojando el siguiente comportamiento cuantitativo:
+### 6.2 A/B Testing Algorítmico y Resultados Empíricos
+Para garantizar la mejor generalización en el entorno de producción, se implementó una estrategia de experimentación múltiple entrenando y evaluando tres arquitecturas de Machine Learning distintas:
 
-| Instancia de Evaluación               | Métrica MAE (Minutos)     | Coeficiente $R^2$         | Interpretación Técnica                                    |
-| ------------------------------------- | ------------------------- | ------------------------- | ----------------------------------------------- | 
-| **Conjunto de Entrenamiento (Train)** | **4.97 min**              | **0.5543**                | Ajuste base del estimador                       |    
-| **Conjunto de Prueba (Test Set)**     | **4.98 min**              | **0.5500**                | Generalización en datos no vistos               |     
-| **Diferencia (Train - Test)**         | **0.01 min**              | **0.0043**                | **Ausencia total de sobreajuste (Overfitting)** |  
-| **Validación Cruzada ($K=5$ Folds)**  | **4.99 min** ($\pm 0.05$)  | **0.5537** ($\pm 0.0084$) | Estabilidad matemática uniforme                  |     
+| Arquitectura de Machine Learning | Error MAE (Test) | Varianza Explicada ($R^2$) | Estabilidad K-Fold (MAE Promedio $\pm$ STD) |
+| :--- | :--- | :--- | :--- |
+| **1. Regresión Lineal (Baseline)** | 4.98 min | 55.00 % | 4.99 min ($\pm 0.05$) |
+| **2. Árbol de Decisión Simple** | 3.34 min | 79.45 % | 3.31 min ($\pm 0.03$) |
+| **3. Random Forest Regressor** | **3.17 min** | **81.80 %** | **3.17 min** ($\pm 0.03$) |
 
-> **Veredicto de Generalización:** La desviación estándar de apenas $\pm 0.05$ minutos en la validación cruzada y la diferencia de 0.01 minutos entre Train y Test demuestran que el modelo mantiene un comportamiento determinista y generalizable, inmune a perturbaciones del muestreo.
+### 6.3 Conclusión
+Tras someter la arquitectura matemática a estrictas pruebas de generalización (Validación Cruzada K-Fold con 5 particiones aisladas), el equipo dictamina que el modelo **RANDOM FOREST** es el algoritmo definitivo y certificado para su despliegue a producción.
 
-### 6.3 Diagnóstico Visual de Residuos
-La evaluación de los residuos ($e_i = y_i - \hat{y}_i$) reveló:
-* **Campana Gaussiana de Errores:** La distribución de residuos exhibe una distribución normal centrada en $0.0$, demostrando que los errores son homocedásticos y de naturaleza estocástica, sin sesgos sistemáticos de subestimación ni sobreestimación.
-* **Correlación Predicción vs. Realidad:** La nube de dispersión sigue fielmente la directriz diagonal de 45° (*Línea de la Perfección*).
+**Justificación Técnica de la Elección:**
+1. **Minimización del Error Operativo:** Redujo el MAE en más de un 35% frente a la Regresión Lineal base, estableciendo el margen de equivocación logística en apenas 3.17 minutos.
+2. **Capacidad de Comprensión No Lineal:** Alcanzó un $R^2$ cercano al 82%, demostrando la superioridad absoluta de los métodos de ensamble basados en árboles para descifrar interacciones logísticas complejas (como la sinergia negativa entre clima adverso, tráfico denso y vehículos en mal estado) que un modelo estrictamente paramétrico no pudo capturar.
+3. **Estabilidad en Producción:** La desviación estándar transversal en el K-Fold fue de ínfimos $\pm 0.03$ minutos, demostrando científicamente que el Random Forest consolidó las reglas logísticas del negocio generalizando la información, sin caer en *Overfitting*.
 
 ### 6.4 Serialización MLOps para Producción (`models/`)
-Utilizando la librería `joblib`, se serializaron los componentes desacoplados del sistema en la carpeta `models/`:
-* `models/pipeline_preprocesamiento.joblib`: Pipeline ajustado con los pesos, medianas y codificadores.
-* `models/modelo_regresion_lineal.joblib`: Estimador entrenado con los coeficientes óptimos.
+Utilizando la librería `joblib`, se serializó la tubería ganadora en la carpeta `models/`:
+* `models/modelo_random_forest.joblib`: Este artefacto no es solo el estimador final, sino que **encapsula recursivamente toda la tubería `Pipeline`**. Contiene en su interior las clases personalizadas (`LimpiadorFormatosKaggle`, `CalculadorDistancia`), el `SimpleImputer`, el `StandardScaler`, el `OneHotEncoder` y los hiperparámetros del bosque. 
 
-Esto permite que un microservicio o API de inferencia (e.g., FastAPI, Flask) cargue ambos componentes en memoria y procese pedidos entrantes en tiempo real con latencia inferior a 15 ms.
+Esto permite que un microservicio o API de inferencia (e.g., FastAPI, Flask) cargue el archivo en memoria y procese pedidos JSON crudos entrantes en tiempo real, sin necesidad de reescribir la lógica de limpieza en el backend.
 
 ---
 
@@ -174,67 +173,23 @@ prediction-delivery-ml/
 │
 ├── data/
 │   ├── raw/                      # Dataset crudo original descargado de Kaggle (train.csv)
-│   └── processed/                # Particiones train_processed.csv y test_processed.csv
+│   └── processed/                # Particiones preprocesadas (train_processed.csv, test_processed.csv)
 │
 ├── notebooks/
-│   ├── 01_EDA_y_Separacion.ipynb             # Fase 3: Muestreo estratificado, EDA (ANOVA y Pearson)
-│   ├── 02_Pipeline_y_FeatureEngineering.ipynb # Fase 4 y 5: Ensayos de transformadores y ColumnTransformer
-│   └── 03_Entrenamiento_Modelo.ipynb         # Fase 6: Entrenamiento, K-Fold CV, métricas y serialización
+│   ├── 01_EDA_y_Separacion.ipynb               # Fase 3: Estratificación, Test ANOVA y Pearson
+│   ├── 02_Pipeline_y_FeatureEngineering.ipynb   # Fase 4 y 5: Orquestación MLOps en memoria
+│   ├── 03_Entrenamiento_RegresionLineal.ipynb   # Fase 6: Entrenamiento Modelo Paramétrico Base
+│   ├── 04_Entrenamiento_ArbolDecision.ipynb     # Fase 6: Entrenamiento Modelo No Lineal (Baseline)
+│   ├── 05_Entrenamiento_RandomForest.ipynb      # Fase 6: Entrenamiento Modelo de Ensamble (Campeón)
+│   └── 06_Evaluacion_Final.ipynb               # Fase 6: Reporte Ejecutivo y Comparativa Visual
 │
 ├── src/
 │   ├── __init__.py
 │   ├── ingesta.py                # Fase 2: Descarga y carga automatizada desde Kaggle
-│   ├── transformadores.py        # Fase 4: Clases LimpiadorFormatosKaggle y CalculadorDistancia
-│   └── pipeline.py               # Fase 5: Tubería unificada de preprocesamiento
+│   ├── transformadores.py        # Fase 4: POO (LimpiadorFormatosKaggle y CalculadorDistancia)
+│   └── pipeline.py               # Fase 5: Tubería unificada de preprocesamiento preventivo de fugas
 │
-├── models/                       # Fase 6: Modelos y pipelines serializados en formato .joblib
-├── requirements.txt              # Definición declarativa de dependencias
-├── .gitignore                    # Reglas de exclusión para datos procesados y credenciales
-└── README.md                     # Documento técnico del proyecto (Entregable 3.1)
-```
-
-### Instrucciones de Instalación y Ejecución
-
-#### 1. Clonar el repositorio y preparar el entorno virtual
-```bash
-# Clonar repositorio
-git clone <URL_DEL_REPOSITORIO>
-cd prediction-delivery-ml
-
-# Crear y activar entorno virtual
-python -m venv venv
-
-# Windows (PowerShell):
-venv\Scripts\Activate.ps1
-
-# Linux / macOS:
-source venv/bin/activate
-
-# Instalar dependencias del sistema
-pip install -r requirements.txt
-```
-
-#### 2. Configuración de Credenciales de Kaggle
-Coloque su archivo `kaggle.json` en la ruta correspondiente del sistema:
-* **Windows:** `C:\Users\<Usuario>\.kaggle\kaggle.json`
-* **Linux/macOS:** `~/.kaggle/kaggle.json`
-
-O defina las variables de entorno:
-```bash
-export KAGGLE_USERNAME="su_usuario"
-export KAGGLE_KEY="su_api_key"
-```
-
-#### 3. Ejecución de la Ingesta Automatizada
-```bash
-python src/ingesta.py
-```
-
-#### 4. Ejecución del Flujo de Trabajo
-Los notebooks se ejecutan de manera secuencial para reproducir las fases analíticas y de entrenamiento:
-```bash
-jupyter notebook
-```
-1. `notebooks/01_EDA_y_Separacion.ipynb` (Particiona y exporta los datos a `data/processed/`).
-2. `notebooks/02_Pipeline_y_FeatureEngineering.ipynb` (Valida las transformaciones en memoria).
-3. `notebooks/03_Entrenamiento_Modelo.ipynb` (Entrena, valida y exporta los artefactos a `models/`).
+├── models/                       # Fase 6: Artefactos exportados listos para backend (.joblib)
+├── requirements.txt              # Definición declarativa estricta de dependencias
+├── .gitignore                    # Reglas de exclusión para credenciales y entornos virtuales
+└── README.md                     # Documento Técnico del Proyecto (Entregable Final)
