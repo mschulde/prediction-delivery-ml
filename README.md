@@ -106,13 +106,13 @@ Para cumplir con los principios de *duck typing* de Scikit-Learn (`fit`, `transf
 * **Justificación Matemática y de Negocio:** Cuatro coordenadas geográficas aisladas (`Restaurant_latitude`, `Restaurant_longitude`, `Delivery_location_latitude`, `Delivery_location_longitude`) no guardan una relación lineal interpretable con el tiempo. El determinante físico real del tiempo de traslado es la **distancia de desplazamiento**.
 * **Fundamento Físico-Matemático:** Implementa la **Fórmula de Haversine**, calculando la distancia ortodrómica sobre una esfera de radio medio $R = 6371\text{ km}$:
 
-$$\Delta\phi = \phi_2 - \phi_1, \quad \Delta\lambda = \lambda_2 - \lambda_1$$
+$$ \Delta\phi = \phi_2 - \phi_1, \quad \Delta\lambda = \lambda_2 - \lambda_1 $$
 
 $$a = \sin^2\left(\frac{\Delta\phi}{2}\right) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(\frac{\Delta\lambda}{2}\right)$$
 
 $$c = 2 \cdot \arcsin\left(\sqrt{a}\right)$$
 
-$$\text{Distancia\_km} = R \cdot c$$
+$$ \text{Distancia}_{km} = R \cdot c $$
 
 * **Reducción de Dimensionalidad:** Al generar `Distancia_km`, el transformador descarta de inmediato las cuatro columnas de coordenadas crudas, mitigando la multicolinealidad y reduciendo el espacio de búsqueda del estimador.
 
